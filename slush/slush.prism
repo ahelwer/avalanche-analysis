@@ -1,0 +1,114 @@
+mdp
+
+// Number of slush loop iterations
+const int M = 10;
+
+module slushprocess1
+	// Instruction counter
+	pc1 : [0 .. 5] init 0;
+	
+	// Color currently chosen by this node
+	// 0: no color, 1: red, 2: blue
+	col1 : [0 .. 2];
+
+	// Iteration counter
+	r1 : [0 .. M] init 0;
+
+	// Flags for random sample pending in this process
+	sampleRequest1_2: [0 .. 2] init 0;
+	sampleRequest1_3: [0 .. 2] init 0;
+	
+	// Response to sample request from other processes
+	// Specifies query iteration to which process is responding
+	sampleResponseIter1_2: [0 .. M] init 0;
+	sampleResponseIter1_3: [0 .. M] init 0;
+	// Specifies color
+	sampleResponse1_2: [0 .. 2] init 0;
+	sampleResponse1_3: [0 .. 2] init 0;
+
+	// Instruction 0: nondeterministically initialize color
+	[] pc1 = 0 -> (pc1' = 1) & (col1' = 0);
+	[] pc1 = 0 -> (pc1' = 1) & (col1' = 1);
+	[] pc1 = 0 -> (pc1' = 1) & (col1' = 2);
+	
+	// Instruction 1: top-level conditional for for-loop
+	[] pc1 = 1 & r1 = M -> (pc1' = 5);
+	[] pc1 = 1 & r1 < M -> (pc1' = 2) & (r1' = r1 + 1);
+
+	// Instruction 2: skip loop if no color is set
+	[] pc1 = 2 & col1 = 0 -> (pc1' = 1);
+	[] pc1 = 2 & col1 != 0 -> (pc1' = 3);
+
+	// Instruction 3: randomly sample K nodes
+	[] pc1 = 3 ->
+		0.5 : (pc1' = 4) & (sampleRequest1_2' = col1) +
+		0.5 : (pc1' = 4) & (sampleRequest1_3' = col1);
+
+	// Instruction 4: gather responses, return to top of loop
+	[] pc1 = 4
+	& sampleRequest1_2 != 0
+	& sampleResponseIter2_1 = r1 ->
+		(pc1' = 1)
+		& (col1' = sampleResponse2_1)
+		& (sampleRequest1_2' = 0);
+	[] pc1 = 4
+	& sampleRequest1_3 != 0
+	& sampleResponseIter3_1 = r1 ->
+		(pc1' = 1)
+		& (col1' = sampleResponse3_1)
+		& (sampleRequest1_3' = 0);
+
+	// Instruction 5: acceptance/termination state
+	[] pc1 = 5 -> true;
+
+	// Responds to query from process 2 at any time
+	[] sampleRequest2_1 != 0 & sampleResponseIter1_2 < r2 & col1 != 0 ->
+		(sampleResponseIter1_2' = r2) & (sampleResponse1_2' = col1);
+	[] sampleRequest2_1 != 0 & sampleResponseIter1_2 < r2 & col1 = 0 ->
+		(sampleResponseIter1_2' = r2) & (sampleResponse1_2' = sampleRequest2_1) & (col1' = sampleRequest2_1);
+
+	// Responds to query from process 3 at any time
+	[] sampleRequest3_1 != 0 & sampleResponseIter1_3 < r3 & col1 != 0 ->
+		(sampleResponseIter1_3' = r3) & (sampleResponse1_3' = col1);
+	[] sampleRequest3_1 != 0 & sampleResponseIter1_3 < r3 & col1 = 0 ->
+		(sampleResponseIter1_3' = r3) & (sampleResponse1_3' = sampleRequest3_1) & (col1' = sampleRequest3_1);
+
+endmodule
+
+module slushprocess2 = slushprocess1[
+	pc1 = pc2,
+	col1 = col2,
+	r1 = r2,
+	r2 = r3,
+	r3 = r1,
+	sampleRequest1_2 = sampleRequest2_3,
+	sampleRequest1_3 = sampleRequest2_1,
+	sampleRequest2_1 = sampleRequest3_2,
+	sampleRequest3_1 = sampleRequest1_2,
+	sampleResponseIter1_2 = sampleResponseIter2_3,
+	sampleResponseIter1_3 = sampleResponseIter2_1,
+	sampleResponseIter2_1 = sampleResponseIter3_2,
+	sampleResponseIter3_1 = sampleResponseIter1_2,
+	sampleResponse1_2 = sampleResponse2_3,
+	sampleResponse1_3 = sampleResponse2_1,
+	sampleResponse2_1 = sampleResponse3_2,
+	sampleResponse3_1 = sampleResponse1_2] endmodule
+
+module slushprocess3 = slushprocess1[
+	pc1 = pc3,
+	col1 = col3,
+	r1 = r3,
+	r2 = r1,
+	r3 = r2,
+	sampleRequest1_2 = sampleRequest3_1,
+	sampleRequest1_3 = sampleRequest3_2,
+	sampleRequest2_1 = sampleRequest1_3,
+	sampleRequest3_1 = sampleRequest2_3,
+	sampleResponseIter1_2 = sampleResponseIter3_1,
+	sampleResponseIter1_3 = sampleResponseIter3_2,
+	sampleResponseIter2_1 = sampleResponseIter1_3,
+	sampleResponseIter3_1 = sampleResponseIter2_3,
+	sampleResponse1_2 = sampleResponse3_1,
+	sampleResponse1_3 = sampleResponse3_2,
+	sampleResponse2_1 = sampleResponse1_3,
+	sampleResponse3_1 = sampleResponse2_3] endmodule
