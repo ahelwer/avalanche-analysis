@@ -1,11 +1,11 @@
 mdp
 
 // Number of slush loop iterations
-const int M = 10;
+const int M = 3;
 
 module slushprocess1
 	// Instruction counter
-	pc1 : [0 .. 5] init 0;
+	pc1 : [0 .. 4] init 0;
 	
 	// Color currently chosen by this node
 	// 0: no color, 1: red, 2: blue
@@ -23,43 +23,40 @@ module slushprocess1
 	sampleResponseIter1_2: [0 .. M] init 0;
 	sampleResponseIter1_3: [0 .. M] init 0;
 	// Specifies color
-	sampleResponse1_2: [0 .. 2] init 0;
-	sampleResponse1_3: [0 .. 2] init 0;
+	sampleResponse1_2: [1 .. 2];
+	sampleResponse1_3: [1 .. 2];
 
 	// Instruction 0: nondeterministically initialize color
-	[] pc1 = 0 -> (pc1' = 1) & (col1' = 0);
+	[] pc1 = 0 & !(col2 = 0 & col3 = 0) -> (pc1' = 1) & (col1' = 0);
 	[] pc1 = 0 -> (pc1' = 1) & (col1' = 1);
 	[] pc1 = 0 -> (pc1' = 1) & (col1' = 2);
 	
-	// Instruction 1: top-level conditional for for-loop
-	[] pc1 = 1 & r1 = M -> (pc1' = 5);
-	[] pc1 = 1 & r1 < M -> (pc1' = 2) & (r1' = r1 + 1);
+	// Instruction 1: for-loop top-level conditional
+	[] pc1 = 1 & r1 = M -> (pc1' = 4);
+	[] pc1 = 1 & r1 < M & col1 = 0 -> (r1' = r1 + 1);
+	[] pc1 = 1 & r1 < M & col1 != 0 -> (pc1' = 2) & (r1' = r1 + 1);
 
-	// Instruction 2: skip loop if no color is set
-	[] pc1 = 2 & col1 = 0 -> (pc1' = 1);
-	[] pc1 = 2 & col1 != 0 -> (pc1' = 3);
+	// Instruction 2: randomly sample K nodes
+	[] pc1 = 2 ->
+		0.5 : (pc1' = 3) & (sampleRequest1_2' = col1) +
+		0.5 : (pc1' = 3) & (sampleRequest1_3' = col1);
 
-	// Instruction 3: randomly sample K nodes
-	[] pc1 = 3 ->
-		0.5 : (pc1' = 4) & (sampleRequest1_2' = col1) +
-		0.5 : (pc1' = 4) & (sampleRequest1_3' = col1);
-
-	// Instruction 4: gather responses, return to top of loop
-	[] pc1 = 4
+	// Instruction 3: gather responses, return to top of loop
+	[] pc1 = 3
 	& sampleRequest1_2 != 0
 	& sampleResponseIter2_1 = r1 ->
 		(pc1' = 1)
 		& (col1' = sampleResponse2_1)
 		& (sampleRequest1_2' = 0);
-	[] pc1 = 4
+	[] pc1 = 3
 	& sampleRequest1_3 != 0
 	& sampleResponseIter3_1 = r1 ->
 		(pc1' = 1)
 		& (col1' = sampleResponse3_1)
 		& (sampleRequest1_3' = 0);
 
-	// Instruction 5: acceptance/termination state
-	[] pc1 = 5 -> true;
+	// Instruction 4: acceptance/termination state
+	[] pc1 = 4 -> true;
 
 	// Responds to query from process 2 at any time
 	[] sampleRequest2_1 != 0 & sampleResponseIter1_2 < r2 & col1 != 0 ->
@@ -78,6 +75,8 @@ endmodule
 module slushprocess2 = slushprocess1[
 	pc1 = pc2,
 	col1 = col2,
+	col2 = col3,
+	col3 = col1,
 	r1 = r2,
 	r2 = r3,
 	r3 = r1,
@@ -97,6 +96,8 @@ module slushprocess2 = slushprocess1[
 module slushprocess3 = slushprocess1[
 	pc1 = pc3,
 	col1 = col3,
+	col2 = col1,
+	col3 = col2,
 	r1 = r3,
 	r2 = r1,
 	r3 = r2,
